@@ -1,0 +1,577 @@
+@using ManagerApp.Core.ViewModels
+@model ProjectAccessViewModel
+
+@{
+    ViewData["Title"] = "Project Access";
+    var p = Model.Project;
+    bool canEdit = User.IsInRole("Admin") || User.IsInRole("Manager");
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="fw-bold">@p.Title <span class="text-muted">(P-@p.Id)</span></h4>
+
+        <ul class="nav nav-tabs mt-3" id="AccessTabs">
+            <li class="nav-item"><a class="nav-link active" data-target="tasks-section">Tasks</a></li>
+            <li class="nav-item"><a class="nav-link" data-target="users-section">Users</a></li>
+            <li class="nav-item"><a class="nav-link" data-target="documents-section">Documents</a></li>
+        </ul>
+    </div>
+
+    @if (canEdit)
+    {
+        <button class="btn btn-primary" onclick="openDrawer('/TaskItems/CreateDrawer?projectId=@p.Id')">
+            <i class="bi bi-plus-circle"></i> Add Task
+        </button>
+    }
+</div>
+
+<!-- ===================== TASK TABLE ===================== -->
+<div id="tasks-section" class="section">
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Task</th>
+                    <th style="min-width:260px;">Owners</th>
+                    <th>Status</th>
+                    <th>Tags</th>
+                    <th>Priority</th>
+                    <th>Start</th>
+                    <th>Complete</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var t in Model.Tasks)
+                {
+                    <tr>
+                        <td>@t.Id</td>
+
+                        <!-- TITLE -->
+                        <td style="width: 260px;">
+                            @if (canEdit)
+                            {
+                                <input class="editable form-control" data-id="@t.Id" data-field="Title" value="@t.Title" />
+                            }
+                            else
+                            {
+                                <input class="editable form-control" value="@t.Title" disabled />
+                            }
+                        </td>
+
+                        <td>
+                            <div class="owner-box" data-task="@t.Id">
+
+                                <!-- Selected Owners -->
+                                <div class="owner-tags">
+                                    @foreach (var u in Model.AllUsers.Where(x => t.AssignedUsers.Contains(x.Id)))
+                                    {
+                                        <span class="owner-tag">
+                                            <span class="avatar-circle">@u.UserName.Substring(0, 1)</span>
+                                            @u.UserName
+                                            <i class="bi bi-x owner-remove" onclick="removeOwner('@t.Id','@u.Id')"></i>
+                                        </span>
+                                    }
+
+                                    @if (!t.AssignedUsers.Any())
+                                    {
+                                        <span class="text-muted small">No owners</span>
+                                    }
+                                </div>
+
+                                <!-- Simple clickable bar (no search) -->
+                                <div class="owner-input" onclick="toggleDropdown(@t.Id)">
+                                    <span class="text-secondary">Select owners…</span>
+                                    <i class="bi bi-chevron-down ms-auto"></i>
+                                </div>
+
+                                <!-- Dropdown -->
+                                <div class="owner-dropdown" id="dd-@t.Id">
+                                    <div class="dropdown-title">Project Users</div>
+
+                                    @foreach (var u in Model.AllUsers)
+                                    {
+                                        <div class="owner-option" onclick="toggleOwner('@t.Id','@u.Id')">
+
+                                            <span class="avatar-circle avatar-small">
+                                                @u.UserName.Substring(0, 1)
+                                            </span>
+
+                                            <div class="owner-info">
+                                                <div class="owner-name">@u.UserName</div>
+                                                <div class="owner-email">@u.Email</div>
+                                            </div>
+
+                                            <input type="checkbox"
+                                                   class="owner-check"
+                                                   value="@u.Id"
+                                                   @(t.AssignedUsers.Contains(u.Id) ? "checked" : "") />
+                                        </div>
+                                    }
+                                </div>
+
+                            </div>
+                        </td>
+
+
+                        <!-- STATUS -->
+                        <td style="width:110px;">
+                            @if (canEdit)
+                            {
+                                <select class="form-select form-select-sm editable" data-id="@t.Id" data-field="Status">
+                                    <option value="Open" selected="@(t.Status == "Open")">Open</option>
+                                    <option value="InProgress" selected="@(t.Status == "InProgress")">In Progress</option>
+                                    <option value="Closed" selected="@(t.Status == "Closed")">Closed</option>
+                                </select>
+                            }
+                            else
+                            {
+                                <select class="form-select form-select-sm" disabled>
+                                    <option>@t.Status</option>
+                                </select>
+                            }
+                        </td>
+
+                        <!-- TAGS -->
+                        <td style="width:160px;">
+                            @if (canEdit)
+                            {
+                                <input class="editable form-control" data-id="@t.Id" data-field="Tags" value="@t.Tags" />
+                            }
+                            else
+                            {
+                                <input class="form-control" value="@t.Tags" disabled />
+                            }
+                        </td>
+
+                        <!-- PRIORITY -->
+                        <td style="width:110px;">
+                            @if (canEdit)
+                            {
+                                <select class="form-select form-select-sm editable" data-id="@t.Id" data-field="Priority">
+                                    <option value="Low" selected="@(t.Priority == "Low")">Low</option>
+                                    <option value="Medium" selected="@(t.Priority == "Medium")">Medium</option>
+                                    <option value="High" selected="@(t.Priority == "High")">High</option>
+                                </select>
+                            }
+                            else
+                            {
+                                <select class="form-select form-select-sm" disabled>
+                                    <option>@t.Priority</option>
+                                </select>
+                            }
+                        </td>
+
+                        <!-- START -->
+                        <td>
+                            @if (canEdit)
+                            {
+                                <input type="date" class="editable form-control" data-id="@t.Id" data-field="StartDate" value="@(t.StartDate?.ToString("yyyy-MM-dd"))" />
+                            }
+                            else
+                            {
+                                <input type="date" class="form-control" value="@(t.StartDate?.ToString("yyyy-MM-dd"))" disabled />
+                            }
+                        </td>
+
+                        <!-- COMPLETE -->
+                        <td>
+                            @if (canEdit)
+                            {
+                                <input type="date" class="editable form-control" data-id="@t.Id" data-field="CompletedDate" value="@(t.CompletedDate?.ToString("yyyy-MM-dd"))" />
+                            }
+                            else
+                            {
+                                <input type="date" class="form-control" value="@(t.CompletedDate?.ToString("yyyy-MM-dd"))" disabled />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ========================= USERS SECTION ========================= -->
+<div id="users-section" class="section d-none">
+    <h4 class="fw-bold mb-3">Assigned Users</h4>
+    <ul class="list-group">
+        @foreach (var u in Model.AssignedUsers)
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>@u.UserName</strong><br />
+                    <small class="text-muted">@u.Email</small>
+                </div>
+                @if (canEdit)
+                {
+                    <form asp-action="RemoveUserFromProject" method="post" class="d-inline">
+                        <input type="hidden" name="projectId" value="@p.Id" />
+                        <input type="hidden" name="userId" value="@u.Id" />
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button>
+                    </form>
+                }
+            </li>
+        }
+        @if (!Model.AssignedUsers.Any())
+        {
+            <li class="list-group-item text-muted">No users assigned.</li>
+        }
+    </ul>
+</div>
+
+<!-- ========================= DOCUMENTS SECTION ========================= -->
+<div id="documents-section" class="section d-none">
+    <div class="d-flex justify-content-between mb-3">
+        <h4 class="fw-bold">Documents</h4>
+        @if (canEdit)
+        {
+            <label class="btn btn-dark btn-sm">
+                <i class="bi bi-plus-lg"></i>
+                <input type="file" id="uploadBtn" hidden />
+            </label>
+        }
+    </div>
+
+    <div class="row g-3" id="docGrid">
+        @foreach (var doc in Model.Documents)
+        {
+            <div class="col-6 col-md-3 col-lg-2">
+                <div class="card shadow-sm border-0">
+                    <a href="@doc.FilePath" target="_blank">
+                        <img src="@doc.FilePath" class="card-img-top" style="height:150px;object-fit:cover;" />
+                    </a>
+                    <div class="card-body p-2 text-center">
+                        <small>@doc.FileName</small>
+                        @if (canEdit)
+                        {
+                            <form asp-action="DeleteDocument" method="post" class="mt-2">
+                                <input type="hidden" name="id" value="@doc.Id" />
+                                <input type="hidden" name="projectId" value="@p.Id" />
+                                <button class="btn btn-danger btn-sm w-100"><i class="bi bi-trash"></i></button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ========================= JAVASCRIPT ========================= -->
+<script>
+    // TAB SWITCHING
+    document.querySelectorAll("#AccessTabs .nav-link").forEach(tab => {
+        tab.onclick = () => {
+            document.querySelectorAll("#AccessTabs .nav-link").forEach(x => x.classList.remove("active"));
+            tab.classList.add("active");
+
+            document.querySelectorAll(".section").forEach(s => s.classList.add("d-none"));
+            document.getElementById(tab.dataset.target).classList.remove("d-none");
+        };
+    });
+
+    // INLINE EDIT (Title, Tags, etc.)
+    $(".editable").on("change", function () {
+        if (!@canEdit.ToString().ToLower()) return;
+        $.post("/TaskItems/InlineUpdate", {
+            id: $(this).data("id"),
+            field: $(this).data("field"),
+            value: $(this).val()
+        });
+    });
+
+    // DROPDOWN toggle: show/hide the owner dropdown for a task
+    function toggleDropdown(taskId) {
+        // Hide other dropdowns
+        $(".owner-dropdown").not(`#dd-${taskId}`).hide();
+        // Show/Hide this one
+        $(`#dd-${taskId}`).toggle();
+        // Focus search input inside shown dropdown
+        if ($(`#dd-${taskId}`).is(":visible")) {
+            $(`.owner-search[data-task='${taskId}']`).focus();
+        }
+    }
+
+    // Click anywhere outside closes dropdown(s) and triggers autosave for any open dropdown
+       // Prevent page scroll when scrolling inside dropdown
+    $(document).on("wheel", ".owner-dropdown", function (e) {
+
+        const dropdown = this;
+
+        const scrollTop = dropdown.scrollTop;
+        const scrollHeight = dropdown.scrollHeight;
+        const height = dropdown.clientHeight;
+
+        const delta = e.originalEvent.deltaY;
+
+        // SCROLL DOWN LIMIT
+        if (delta > 0 && scrollTop + height >= scrollHeight) {
+            e.preventDefault();
+            return;
+        }
+
+        // SCROLL UP LIMIT
+        if (delta < 0 && scrollTop <= 0) {
+            e.preventDefault();
+            return;
+        }
+
+        // Allow scroll INSIDE dropdown only
+        e.stopPropagation();
+    });
+
+
+    // Prevent page from scrolling when wheel is used over the dropdown
+    $(document).on("wheel", ".owner-dropdown", function (e) {
+        e.stopPropagation();
+    });
+
+    // Toggle checkbox only (do not auto-save per-click)
+    function toggleOwner(taskId, userId) {
+        let cb = $(`#dd-${taskId} .owner-check[value='${userId}']`);
+        cb.prop("checked", !cb.prop("checked"));
+    }
+
+    // Remove tag (immediate save)
+    function removeOwner(taskId, userId) {
+        let cb = $(`#dd-${taskId} .owner-check[value='${userId}']`);
+        cb.prop("checked", false);
+        saveOwners(taskId);
+    }
+
+    // Save selected owners for taskId (called when dropdown closes or removeOwner)
+    function saveOwners(taskId) {
+        let selected = $(`#dd-${taskId} .owner-check:checked`)
+            .map(function () { return this.value; })
+            .get();
+
+        $.ajax({
+            url: "/Projects/UpdateTaskOwners",
+            method: "POST",
+            traditional: true,
+            data: { taskId: taskId, users: selected },
+            success: function () {
+                // Update tag display without reload:
+                let container = $(`.owner-box[data-task='${taskId}']`);
+                let tagsContainer = container.find(".owner-tags");
+                // rebuild tags
+                tagsContainer.empty();
+                if (selected.length === 0) {
+                    tagsContainer.append(`<span class="text-muted small">No owners</span>`);
+                } else {
+                    selected.forEach(function (uid) {
+                        // find username text in dropdown
+                        let name = $(`#dd-${taskId} .owner-option[data-user='${uid}'] .owner-name`).text() || "";
+                        tagsContainer.append(
+                            `<span class="owner-tag shadow-sm" data-user="${uid}">
+                                <span class="avatar-circle">${name.charAt(0).toUpperCase()}</span>
+                                <span class="tag-name">${name}</span>
+                                <i class="bi bi-x owner-remove" title="Remove" onclick="removeOwner('${taskId}','${uid}')"></i>
+                             </span>`
+                        );
+                    });
+                }
+                // hide dropdown (already hidden in outside click flow), but ensure state
+                $(`#dd-${taskId}`).hide();
+            },
+            error: function () {
+                alert("Failed to update owners. Try again.");
+            }
+        });
+    }
+
+    // Filter dropdown list by typed text (client-side)
+    function filterOwnerList(e, taskId) {
+        let q = $(e.target).val().toLowerCase().trim();
+        $(`#dd-${taskId} .owner-option`).each(function () {
+            let name = $(this).find(".owner-name").text().toLowerCase();
+            let email = $(this).find(".owner-email").text().toLowerCase();
+            if (!q || name.includes(q) || email.includes(q)) $(this).show(); else $(this).hide();
+        });
+    }
+
+    // Document uploader (kept as earlier)
+    document.addEventListener("dragover", e => e.preventDefault());
+    document.addEventListener("drop", e => {
+        e.preventDefault();
+        if (!@canEdit.ToString().ToLower()) return;
+        if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+    });
+    if (@canEdit.ToString().ToLower()) {
+        document.getElementById("uploadBtn")?.addEventListener("change", function () {
+            uploadFile(this.files[0]);
+        });
+    }
+    function uploadFile(file) {
+        let formData = new FormData();
+        formData.append("file", file);
+        formData.append("projectId", "@p.Id");
+        fetch("/Projects/UploadDocument", { method: "POST", body: formData }).then(() => location.reload());
+    }
+
+</script>
+
+<!-- ========================= STYLES (PROFESSIONAL) ========================= -->
+<style>
+    /* general */
+    .section {
+        margin-top: 12px;
+    }
+
+    .editable {
+        border: 1px solid transparent;
+        padding: 6px;
+    }
+
+        .editable:focus {
+            border-color: #0d6efd;
+            background: #fff;
+        }
+
+    /* owner picker */
+    .owner-box {
+        position: relative;
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .owner-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 6px;
+        min-height: 28px;
+        align-items: center;
+    }
+
+    .owner-tag {
+        background: #eef2ff;
+        padding: 4px 8px;
+        border-radius: 18px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        border: 1px solid #d8defc;
+    }
+
+        .owner-tag .owner-remove {
+            cursor: pointer;
+            color: #c23b3b;
+            font-size: 14px;
+            margin-left: 4px;
+        }
+
+    .avatar-circle {
+        width: 28px;
+        height: 28px;
+        background: #4c6ef5;
+        color: #fff;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 13px;
+    }
+
+    .avatar-small {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+    }
+
+    .owner-input {
+        border: 1px solid #dee2e6;
+        padding: 6px 8px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fff;
+    }
+
+        .owner-input input {
+            border: none;
+            outline: none;
+            flex: 1;
+            font-size: 13px;
+        }
+
+    .owner-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        width: 100%;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+        border: 1px solid #e9ecef;
+        padding: 8px;
+        z-index: 9999;
+        display: none;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+
+    .dropdown-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6c757d;
+        margin-bottom: 8px;
+        padding-left: 4px;
+    }
+
+    .owner-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+        .owner-option:hover {
+            background: #f5f7ff;
+        }
+
+    .owner-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .owner-name {
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .owner-email {
+        font-size: 12px;
+        color: #6c757d;
+    }
+
+    .owner-check {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* small screens */
+    @@media (max-width: 768px) {
+        .owner-box
+
+    {
+        max-width: 100%;
+    }
+
+    }
+</style>
